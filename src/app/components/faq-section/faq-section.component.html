@@ -1,0 +1,23 @@
+<section id="faq" class="faq">
+  <div class="faq__inner">
+    <h2 class="faq__title">FAQ</h2>
+    <div class="faq__list">
+      @for (item of faqs; track item.question; let i = $index) {
+        <div class="faq-item" [class.faq-item--open]="openIndex() === i">
+          <button
+            type="button"
+            class="faq-item__question"
+            [attr.aria-expanded]="openIndex() === i"
+            (click)="toggle(i)"
+          >
+            {{ item.question }}
+            <span class="faq-item__icon">+</span>
+          </button>
+          @if (openIndex() === i) {
+            <p class="faq-item__answer">{{ item.answer }}</p>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</section>

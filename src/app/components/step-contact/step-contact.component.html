@@ -1,0 +1,59 @@
+<div class="step">
+  <h2 class="step__title">Your contact details</h2>
+  <p class="step__subtitle">Last step — then you'll see your complete quote.</p>
+
+  <label class="step__field step__field--full">
+    <span>Your full name</span>
+    <input
+      type="text"
+      placeholder="e.g. Jean Dupont"
+      [value]="state.contact().name"
+      (input)="onFieldChange('name', $any($event.target).value)"
+    />
+  </label>
+
+  <label class="step__field step__field--full">
+    <span>WhatsApp / Phone number</span>
+    <input
+      type="tel"
+      placeholder="e.g. 5XXX XXXX"
+      [value]="state.contact().phone"
+      (input)="onFieldChange('phone', $any($event.target).value)"
+    />
+  </label>
+
+  <label class="step__field step__field--full">
+    <span>When do you need it? (optional)</span>
+    <input
+      type="date"
+      [value]="state.contact().dateNeeded ?? ''"
+      (input)="onFieldChange('dateNeeded', $any($event.target).value)"
+    />
+  </label>
+
+  <label class="step__field step__field--full">
+    <span>Notes for us (optional)</span>
+    <textarea
+      rows="3"
+      placeholder="e.g. call before delivery, gate code, specific instructions…"
+      [value]="state.contact().notes"
+      (input)="onFieldChange('notes', $any($event.target).value)"
+    ></textarea>
+  </label>
+
+  @if (state.quoteError()) {
+    <p class="step__error">{{ state.quoteError() }}</p>
+  }
+
+  <div class="step__actions">
+    <button type="button" class="step__back" (click)="state.previousStep()">← Back</button>
+    <button
+      type="button"
+      class="step__submit"
+      [disabled]="!canSubmit || state.quoteLoading()"
+      (click)="submit()"
+    >
+      {{ state.quoteLoading() ? 'Calculating…' : 'See My Quote →' }}
+    </button>
+  </div>
+</div>

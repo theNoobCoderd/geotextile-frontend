@@ -1,0 +1,64 @@
+// Design tokens — matched to the approved reference build.
+// Palette: deep forest header/hero, emerald accents, sage highlights,
+// warm sand/chalk neutrals, ember CTA, WhatsApp green.
+
+// ── Breakpoints (real Sass variables — used in @media queries) ──────────────
+$bp-mobile: 600px;
+$bp-small: 600px;  // alias kept for readability at call sites (form-field stacking etc.)
+$bp-tablet: 860px;
+
+:root {
+  --gtx-forest: #0b2a18;
+  --gtx-emerald: #1a6040;
+  --gtx-sage: #52b788;
+  --gtx-sand: #eadcc4;
+  --gtx-chalk: #f7f2eb;
+  --gtx-ember: #e5511a;
+  --gtx-ember-hover: #cc4514;
+  --gtx-wa: #25d366;
+  --gtx-wa-hover: #22c15e;
+  --gtx-white: #ffffff;
+  --gtx-ink: #1a1a1a;
+  --gtx-muted: #6b7280;
+  --gtx-border: #e5e7eb;
+  --gtx-mint-fill: #f0faf5; // selected-card tint
+  --gtx-mint-tint: #f0faf5; // alias — same tint, used across card + section styles
+
+  --gtx-font-display: 'Space Grotesk', system-ui, sans-serif;
+  --gtx-font-body: 'Inter', system-ui, sans-serif;
+
+  --gtx-radius-sm: 8px;
+  --gtx-radius: 10px;
+  --gtx-radius-lg: 14px;
+  --gtx-radius-xl: 20px;
+  --gtx-max-width: 580px;
+  --gtx-page-max-width: 1100px;
+
+  --gtx-tap-min: 44px; // minimum comfortable touch target height
+}
+
+@mixin gtx-heading {
+  font-family: var(--gtx-font-display);
+  color: var(--gtx-forest);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+// Small uppercase field/section labels ("LENGTH (M)", "ROLL WIDTH", etc.)
+@mixin gtx-eyebrow {
+  font-family: var(--gtx-font-display);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gtx-muted);
+}
+
+@mixin gtx-pill {
+  font-family: var(--gtx-font-display);
+  font-weight: 700;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+}

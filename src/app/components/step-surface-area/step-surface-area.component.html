@@ -1,0 +1,110 @@
+<div class="step">
+  <h2 class="step__title">What is your surface area?</h2>
+  <p class="step__subtitle">Enter length × width, or type your total m² directly.</p>
+
+  <div class="step__toggle-group">
+    <button
+      type="button"
+      class="step__toggle-btn"
+      [class.step__toggle-btn--active]="inputMode() === 'lxw'"
+      (click)="setInputMode('lxw')"
+    >
+      Calculate (L × W)
+    </button>
+    <button
+      type="button"
+      class="step__toggle-btn"
+      [class.step__toggle-btn--active]="inputMode() === 'direct'"
+      (click)="setInputMode('direct')"
+    >
+      I know my m²
+    </button>
+  </div>
+
+  @if (inputMode() === 'lxw') {
+    <div class="step__field-row">
+      <label class="step__field">
+        <span>Length (m)</span>
+        <input
+          type="number"
+          inputmode="decimal"
+          min="0"
+          step="0.1"
+          placeholder="e.g. 10"
+          [value]="state.surfaceArea().lengthM ?? ''"
+          (input)="onLengthChange($any($event.target).value)"
+        />
+      </label>
+      <label class="step__field">
+        <span>Width (m)</span>
+        <input
+          type="number"
+          inputmode="decimal"
+          min="0"
+          step="0.1"
+          placeholder="e.g. 5"
+          [value]="state.surfaceArea().widthM ?? ''"
+          (input)="onWidthChange($any($event.target).value)"
+        />
+      </label>
+    </div>
+  } @else {
+    <label class="step__field step__field--full">
+      <span>Total area (m²)</span>
+      <input
+        type="number"
+        inputmode="decimal"
+        min="0"
+        step="0.1"
+        placeholder="e.g. 50"
+        [value]="state.surfaceArea().directM2 ?? ''"
+        (input)="onDirectM2Change($any($event.target).value)"
+      />
+    </label>
+  }
+
+  <fieldset class="step__buffer">
+    <legend>Cutting & overlap buffer</legend>
+    <div class="step__buffer-options">
+      @for (opt of bufferOptions; track opt.value) {
+        <button
+          type="button"
+          class="step__buffer-btn"
+          [class.step__buffer-btn--active]="state.surfaceArea().buffer === opt.value"
+          (click)="onBufferChange(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      }
+    </div>
+    <p class="step__buffer-hint">{{ bufferHint() }}</p>
+  </fieldset>
+
+  @if (state.recommendedAreaM2() > 0) {
+    <div class="step__recommendation">
+      <div>
+        <div class="step__recommendation-label">You'll need</div>
+        <div class="step__recommendation-value">
+          {{ state.recommendedAreaM2() }}<span class="step__recommendation-unit">m²</span>
+        </div>
+      </div>
+      <div class="step__recommendation-meta">
+        <div>{{ state.rawAreaM2().toFixed(1) }}m² area</div>
+        @if (state.surfaceArea().buffer > 0) {
+          <div class="step__recommendation-buffer">+ {{ state.surfaceArea().buffer }}% buffer</div>
+        }
+      </div>
+    </div>
+  }
+
+  <div class="step__actions">
+    <button
+      type="button"
+      class="step__continue step__continue--full"
+      [disabled]="!canContinue"
+      (click)="state.nextStep()"
+    >
+      Continue →
+    </button>
+  </div>
+</div>

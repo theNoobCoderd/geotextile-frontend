@@ -1,0 +1,44 @@
+<section id="products" class="products">
+  <div class="products__inner">
+    <h2 class="products__title">Our Products</h2>
+    <p class="products__subtitle">Two grades — pricing by volume</p>
+
+    <div class="products__grid">
+      @for (product of products(); track product.gsm) {
+        <div class="products__card">
+          <div class="products__card-header">
+            <span class="products__card-icon">{{ product.icon }}</span>
+            <div>
+              <div class="products__card-title">{{ product.gsm }}gsm</div>
+              <div class="products__card-subtitle">{{ product.name }}</div>
+            </div>
+          </div>
+
+          <div class="products__price-row">
+            <div class="products__price-box">
+              <div class="products__price-value">Rs {{ product.pricePerM2 }}</div>
+              <div class="products__price-label">per m² (under {{ product.bulkThresholdM2 }}m²)</div>
+            </div>
+            <div class="products__price-box products__price-box--bulk">
+              <div class="products__price-value products__price-value--bulk">Rs {{ product.bulkPricePerM2 }}</div>
+              <div class="products__price-label products__price-label--bulk">
+                per m² ({{ product.bulkThresholdM2 }}m² and over)
+              </div>
+            </div>
+          </div>
+
+          <div class="products__tags">
+            @for (use of product.uses; track use) {
+              <span class="products__tag">{{ use }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <p class="products__footnote">
+      Not sure which to choose?
+      <a [href]="whatsappLink" target="_blank" rel="noopener">WhatsApp us</a> — we'll advise.
+    </p>
+  </div>
+</section>

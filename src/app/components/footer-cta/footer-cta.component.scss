@@ -1,0 +1,73 @@
+@use '../../../styles/tokens' as *;
+
+.footer-cta {
+  background: var(--gtx-emerald);
+  padding: 3.5rem 1.5rem;
+  text-align: center;
+}
+
+.footer-cta__title {
+  @include gtx-heading;
+  color: var(--gtx-white);
+  font-size: 1.625rem;
+  margin: 0 0 0.75rem;
+}
+
+.footer-cta__subtitle {
+  color: var(--gtx-sand);
+  opacity: 0.9;
+  font-size: 0.9375rem;
+  margin: 0 0 1.875rem;
+}
+
+.footer-cta__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.footer-cta__quote-btn,
+.footer-cta__wa-btn {
+  min-height: var(--gtx-tap-min);
+  font-family: var(--gtx-font-display);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  padding: 0.875rem 1.625rem;
+  border-radius: var(--gtx-radius);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-cta__quote-btn {
+  background: var(--gtx-ember);
+  color: var(--gtx-white);
+
+  &:hover {
+    background: var(--gtx-ember-hover);
+  }
+}
+
+.footer-cta__wa-btn {
+  background: var(--gtx-wa);
+  color: var(--gtx-white);
+
+  &:hover {
+    background: var(--gtx-wa-hover);
+  }
+}
+
+@media (max-width: $bp-mobile) {
+  .footer-cta__actions {
+    flex-direction: column;
+  }
+
+  .footer-cta__quote-btn,
+  .footer-cta__wa-btn {
+    width: 100%;
+  }
+}

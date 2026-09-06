@@ -1,0 +1,25 @@
+@use '../../../styles/step-shared';
+@use '../../../styles/tokens' as *;
+
+.delivery-details {
+  margin-top: 0.25rem;
+}
+
+.delivery-cost-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--gtx-chalk);
+  border: 1px solid var(--gtx-border);
+  border-radius: var(--gtx-radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--gtx-muted);
+}
+
+.delivery-cost-row__value {
+  font-family: var(--gtx-font-display);
+  font-weight: 700;
+  color: var(--gtx-ink);
+  font-size: 1rem;
+}

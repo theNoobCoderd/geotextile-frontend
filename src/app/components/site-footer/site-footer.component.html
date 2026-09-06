@@ -1,0 +1,12 @@
+<footer class="footer">
+  <div class="footer__brand">
+    <span class="footer__brand-accent">Geo</span>textile Mauritius
+  </div>
+  <div class="footer__tagline">Mauritius's First DIY Geotextile Specialist</div>
+  <div class="footer__links">
+    @for (page of pages; track page.handle) {
+      <a [href]="page.url" target="_blank" rel="noopener">📘 {{ page.handle }}</a>
+    }
+  </div>
+  <div class="footer__copyright">© {{ year }} Geotextile Mauritius</div>
+</footer>

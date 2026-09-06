@@ -1,1 +1,23 @@
 /* You can add global styles to this file, and also import other style files */
+@use 'styles/tokens';
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: var(--gtx-font-body);
+  color: var(--gtx-ink);
+  overflow-x: hidden; // belt-and-braces: nothing should ever force horizontal scroll
+}
+
+input, select, textarea { font-family: inherit; }
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+input[type='number'] { -moz-appearance: textfield; }

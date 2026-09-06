@@ -1,0 +1,130 @@
+@use '../../../styles/tokens' as *;
+
+.products {
+  background: var(--gtx-white);
+  padding: 4rem 1.25rem;
+}
+
+.products__inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.products__title {
+  font-family: var(--gtx-font-display);
+  font-weight: 700;
+  font-size: 1.75rem;
+  color: var(--gtx-forest);
+  text-align: center;
+  margin: 0 0 0.625rem;
+}
+
+.products__subtitle {
+  color: var(--gtx-muted);
+  font-size: 0.9375rem;
+  text-align: center;
+  margin: 0 0 2.25rem;
+}
+
+.products__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.products__card {
+  border: 1px solid var(--gtx-border);
+  border-radius: var(--gtx-radius-lg);
+  padding: 1.5rem;
+}
+
+.products__card-header {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.products__card-icon {
+  font-size: 1.875rem;
+}
+
+.products__card-title {
+  font-family: var(--gtx-font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--gtx-forest);
+}
+
+.products__card-subtitle {
+  font-size: 0.8125rem;
+  color: var(--gtx-muted);
+}
+
+.products__price-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.625rem;
+  margin-bottom: 1rem;
+}
+
+.products__price-box {
+  background: var(--gtx-chalk);
+  border-radius: var(--gtx-radius);
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.products__price-box--bulk {
+  background: var(--gtx-mint-tint);
+  border: 1px solid var(--gtx-sage);
+}
+
+.products__price-value {
+  font-family: var(--gtx-font-display);
+  font-weight: 800;
+  font-size: 1.375rem;
+  color: var(--gtx-forest);
+}
+
+.products__price-value--bulk {
+  color: var(--gtx-emerald);
+}
+
+.products__price-label {
+  font-size: 0.6875rem;
+  color: var(--gtx-muted);
+}
+
+.products__price-label--bulk {
+  color: var(--gtx-emerald);
+}
+
+.products__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.products__tag {
+  background: var(--gtx-chalk);
+  color: var(--gtx-muted);
+  font-family: var(--gtx-font-display);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 99px;
+}
+
+.products__footnote {
+  text-align: center;
+  margin-top: 1.25rem;
+  color: var(--gtx-muted);
+  font-size: 0.875rem;
+
+  a {
+    color: var(--gtx-emerald);
+    font-weight: 600;
+    text-decoration: none;
+  }
+}

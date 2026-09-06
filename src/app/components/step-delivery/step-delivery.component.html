@@ -1,0 +1,87 @@
+<div class="step">
+  <h2 class="step__title">Pickup or delivery?</h2>
+  <p class="step__subtitle">Collect free at Tribeca, or we deliver to your door island-wide.</p>
+
+  <div class="step__choice-options">
+    <div
+      class="step__choice-card"
+      [class.step__choice-card--active]="state.delivery().mode === 'pickup'"
+      (click)="selectMode('pickup')"
+    >
+      <span class="step__choice-icon">🏭</span>
+      <div>
+        <div class="step__choice-title">Pickup at Tribeca</div>
+        <div class="step__choice-sub">Free — collect directly at our location</div>
+      </div>
+    </div>
+
+    <div
+      class="step__choice-card"
+      [class.step__choice-card--active]="state.delivery().mode === 'delivery'"
+      (click)="selectMode('delivery')"
+    >
+      <span class="step__choice-icon">🚚</span>
+      <div>
+        <div class="step__choice-title">
+          Delivery to my address
+          @if (state.qualifiesForFreeDelivery()) {
+            <span class="step__badge step__badge--sage">FREE</span>
+          }
+        </div>
+        <div class="step__choice-sub">
+          {{ state.qualifiesForFreeDelivery() ? '🎉 Free for your order size' : 'Rs 300–600 depending on your area' }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  @if (state.delivery().mode === 'delivery') {
+    <div class="delivery-details">
+      <label class="step__field step__field--full">
+        <span>Your town / area</span>
+        <select
+          [value]="state.delivery().zoneId ?? ''"
+          (change)="onZoneChange($any($event.target).value)"
+        >
+          <option value="">Select your area…</option>
+          @for (zone of zones(); track zone.id) {
+            <option [value]="zone.id">
+              {{ zone.label }} — {{ state.qualifiesForFreeDelivery() ? 'Free delivery' : 'Rs ' + zone.costRs }}
+            </option>
+          }
+        </select>
+      </label>
+
+      <label class="step__field step__field--full">
+        <span>Full delivery address</span>
+        <input
+          type="text"
+          placeholder="Street name, town, landmark…"
+          [value]="state.delivery().address"
+          (input)="onAddressChange($any($event.target).value)"
+        />
+      </label>
+
+      @if (state.selectedZone(); as zone) {
+        <div class="delivery-cost-row">
+          <span>Delivery cost</span>
+          <span class="delivery-cost-row__value">
+            {{ state.qualifiesForFreeDelivery() ? 'Free (included)' : 'Rs ' + zone.costRs }}
+          </span>
+        </div>
+      }
+    </div>
+  }
+
+  <div class="step__actions">
+    <button type="button" class="step__back" (click)="state.previousStep()">← Back</button>
+    <button
+      type="button"
+      class="step__continue"
+      [disabled]="!canContinue"
+      (click)="state.nextStep()"
+    >
+      Continue →
+    </button>
+  </div>
+</div>

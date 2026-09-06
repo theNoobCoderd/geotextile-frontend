@@ -1,0 +1,39 @@
+<section id="order-form" class="wizard-section">
+  <div class="wizard">
+    @if (state.catalogError()) {
+      <p class="wizard__error">{{ state.catalogError() }}</p>
+    } @else {
+      @if (showProgress()) {
+        <div class="wizard-progress">
+          <div class="wizard-progress__label">
+            <span class="wizard-progress__step">Step {{ state.currentStep() }} of {{ totalInputSteps }}</span>
+            <span class="wizard-progress__section">{{ currentStepLabel() }}</span>
+          </div>
+          <div class="wizard-progress__track">
+            <div class="wizard-progress__fill" [style.width.%]="progressPercent()"></div>
+          </div>
+        </div>
+      }
+
+      <div class="wizard-panel">
+        @switch (state.currentStep()) {
+          @case (1) {
+            <gtx-step-surface-area />
+          }
+          @case (2) {
+            <gtx-step-product-roll />
+          }
+          @case (3) {
+            <gtx-step-delivery />
+          }
+          @case (4) {
+            <gtx-step-contact />
+          }
+          @case (5) {
+            <gtx-quote-summary />
+          }
+        }
+      </div>
+    }
+  </div>
+</section>

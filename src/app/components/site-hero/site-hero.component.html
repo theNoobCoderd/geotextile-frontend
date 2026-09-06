@@ -1,0 +1,23 @@
+<section class="hero">
+  <span class="hero__pill">🇲🇺 Serving All of Mauritius</span>
+
+  <h1 class="hero__title">
+    Get an exact quote.<br />
+    <span class="hero__title-accent">Order in 2 minutes.</span>
+  </h1>
+
+  <p class="hero__subtitle">
+    Tell us your surface area, your use, and your location.
+    We calculate the exact price — you confirm on WhatsApp.
+  </p>
+
+  <button type="button" class="hero__cta" (click)="scrollToOrder()">
+    Get My Instant Quote →
+  </button>
+
+  <div class="hero__checks">
+    @for (check of checks; track check) {
+      <span>✓ {{ check }}</span>
+    }
+  </div>
+</section>

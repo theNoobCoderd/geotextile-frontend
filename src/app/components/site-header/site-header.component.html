@@ -1,0 +1,18 @@
+<nav class="header">
+  <div class="header__inner">
+    <div class="header__logo">
+      <span class="header__logo-accent">Geo</span>textile
+      <span class="header__logo-sub">Mauritius</span>
+    </div>
+
+    <div class="header__nav">
+      <span (click)="scrollTo('order-form')">Order</span>
+      <span (click)="scrollTo('products')">Products</span>
+      <span (click)="scrollTo('faq')">FAQ</span>
+    </div>
+
+    <a class="header__whatsapp" [href]="whatsappLink" target="_blank" rel="noopener">
+      💬 WhatsApp
+    </a>
+  </div>
+</nav>

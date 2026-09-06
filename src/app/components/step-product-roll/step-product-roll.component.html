@@ -1,0 +1,93 @@
+<div class="step">
+  <h2 class="step__title">What will you use it for?</h2>
+  <p class="step__subtitle">Select the right geotextile for your application.</p>
+
+  <div class="product-list">
+    @for (product of products(); track product.gsm) {
+      <div
+        class="product-card"
+        [class.product-card--active]="state.product().gsm === product.gsm"
+        (click)="selectProduct(product.gsm)"
+      >
+        <div class="product-card__header">
+          <span class="product-card__icon">{{ product.icon }}</span>
+          <div class="product-card__heading">
+            <div class="product-card__title">{{ product.gsm }}gsm — {{ product.name }}</div>
+            <div class="product-card__desc">{{ product.desc }}</div>
+          </div>
+          <div class="product-card__price">
+            <div class="product-card__price-value">Rs {{ priceForProduct(product) }}</div>
+            <div class="product-card__price-label">
+              per m²{{ state.product().gsm === product.gsm && state.isBulkRate() ? ' (bulk)' : '' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="product-card__tags">
+          @for (use of product.uses; track use) {
+            <span class="tag">{{ use }}</span>
+          }
+        </div>
+
+        @if (state.product().gsm === product.gsm) {
+          @if (rollOptionsFor(product).length > 1) {
+            <div class="roll-picker">
+              <div class="roll-picker__label">Roll width</div>
+              <div class="roll-picker__options">
+                @for (roll of rollOptionsFor(product); track roll.widthM) {
+                  <div
+                    class="roll-option"
+                    [class.roll-option--active]="state.product().rollWidthM === roll.widthM"
+                    [class.roll-option--disabled]="!roll.inStock"
+                    (click)="selectRoll(roll, $event)"
+                  >
+                    <div class="roll-option__top">
+                      <span class="roll-option__width">{{ roll.widthM }}m roll</span>
+                      @if (roll.isLeastWaste) {
+                        <span class="step__badge step__badge--sage">LESS WASTE</span>
+                      }
+                      @if (!roll.inStock) {
+                        <span class="step__badge step__badge--muted">OUT OF STOCK</span>
+                      }
+                    </div>
+                    <div class="roll-option__meta">
+                      Cut {{ roll.widthM }}×{{ roll.linearMetersNeeded }}m = {{ roll.billableAreaM2 }}m²
+                      {{ roll.extraM2 > 0 ? '(+' + roll.extraM2 + 'm²)' : '· exact fit' }}
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          @if (state.selectedRollCut(); as cut) {
+            <div class="price-confirm">
+              <div class="price-confirm__row">
+                <span>{{ cut.billableAreaM2 }}m² × Rs {{ state.currentPricePerM2() }}</span>
+                <span class="price-confirm__total">Rs {{ state.productSubtotalRs() }}</span>
+              </div>
+              @if (rollOptionsFor(product).length === 1) {
+                <div class="price-confirm__note">
+                  Cut from our {{ cut.widthM }}m rolls: {{ cut.widthM }}×{{ cut.linearMetersNeeded }}m
+                  {{ cut.extraM2 > 0 ? '(+' + cut.extraM2 + 'm² extra — roll width doesn\'t divide evenly)' : '— exact fit' }}
+                </div>
+              }
+            </div>
+          }
+        }
+      </div>
+    }
+  </div>
+
+  <div class="step__actions">
+    <button type="button" class="step__back" (click)="state.previousStep()">← Back</button>
+    <button
+      type="button"
+      class="step__continue"
+      [disabled]="!canContinue"
+      (click)="state.nextStep()"
+    >
+      Continue →
+    </button>
+  </div>
+</div>

@@ -1,0 +1,47 @@
+@if (state.quoteResult(); as quote) {
+  <div class="step">
+    <h2 class="step__title" style="margin-bottom: 1.25rem">Your order summary</h2>
+
+    <div class="summary-rows">
+      @for (row of rows(); track row.label) {
+        <div class="summary-row">
+          <span class="summary-row__label">{{ row.label }}</span>
+          <span class="summary-row__value">{{ row.value }}</span>
+        </div>
+      }
+    </div>
+
+    <div class="totals-block">
+      <div class="totals-block__row totals-block__row--grand">
+        <span>Grand Total</span>
+        <span class="totals-block__grand-value">Rs {{ quote.grandTotalRs }}</span>
+      </div>
+      <div class="totals-block__row totals-block__row--deposit">
+        <span>Deposit to confirm (30%)</span>
+        <span class="totals-block__deposit-value">Rs {{ quote.depositRs }}</span>
+      </div>
+      <div class="totals-block__row totals-block__row--balance">
+        <span>Balance on delivery / pickup</span>
+        <span>Rs {{ quote.balanceRs }}</span>
+      </div>
+    </div>
+
+    <a class="btn-whatsapp-confirm" [href]="sendToOumarHref" target="_blank" rel="noopener">
+      📱 Confirm My Order on WhatsApp
+    </a>
+    <p class="summary-hint">
+      Your complete order is pre-filled. We'll reply with payment details within minutes.
+    </p>
+
+    @if (canSendCopyToSelf) {
+      <a class="btn-whatsapp-copy" [href]="sendToSelfHref" target="_blank" rel="noopener">
+        📋 Send Myself a Copy
+      </a>
+      <p class="summary-hint">
+        Opens a WhatsApp chat to your own number with this same summary, for your records.
+      </p>
+    }
+
+    <button type="button" class="btn-edit" (click)="editOrder()">← Edit my order</button>
+  </div>
+}

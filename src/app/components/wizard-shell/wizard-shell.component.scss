@@ -1,0 +1,76 @@
+@use '../../../styles/tokens' as *;
+
+.wizard-section {
+  background: var(--gtx-chalk);
+  padding: 3.5rem 1.5rem 4rem;
+}
+
+.wizard {
+  max-width: var(--gtx-max-width);
+  margin: 0 auto;
+  font-family: var(--gtx-font-body);
+  color: var(--gtx-ink);
+}
+
+@media (max-width: $bp-mobile) {
+  .wizard-section {
+    padding: 2.5rem 1.25rem 3rem;
+  }
+}
+
+.wizard-progress {
+  margin-bottom: 1.5rem;
+}
+
+.wizard-progress__label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+  gap: 0.5rem;
+}
+
+.wizard-progress__step {
+  font-family: var(--gtx-font-display);
+  color: var(--gtx-emerald);
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+
+.wizard-progress__section {
+  font-family: var(--gtx-font-display);
+  color: var(--gtx-muted);
+  font-size: 0.8125rem;
+}
+
+.wizard-progress__track {
+  height: 4px;
+  background: var(--gtx-border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.wizard-progress__fill {
+  height: 100%;
+  background: var(--gtx-emerald);
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.wizard-panel {
+  background: var(--gtx-white);
+  border-radius: var(--gtx-radius-xl);
+  padding: 1.75rem 1.5rem;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.07);
+}
+
+@media (max-width: $bp-mobile) {
+  .wizard-panel {
+    padding: 1.5rem 1.25rem;
+    border-radius: var(--gtx-radius-lg);
+  }
+}
+
+.wizard__error {
+  color: var(--gtx-ember);
+}
