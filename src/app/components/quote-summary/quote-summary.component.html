@@ -14,34 +14,54 @@
     <div class="totals-block">
       <div class="totals-block__row totals-block__row--grand">
         <span>Grand Total</span>
-        <span class="totals-block__grand-value">Rs {{ quote.grandTotalRs }}</span>
+        <span class="totals-block__grand-value">Rs {{ quote.grandTotal }}</span>
       </div>
       <div class="totals-block__row totals-block__row--deposit">
-        <span>Deposit to confirm (30%)</span>
-        <span class="totals-block__deposit-value">Rs {{ quote.depositRs }}</span>
+        <span>Deposit to confirm ({{ quote.depositPercent }}%)</span>
+        <span class="totals-block__deposit-value">Rs {{ quote.depositAmount }}</span>
       </div>
       <div class="totals-block__row totals-block__row--balance">
         <span>Balance on delivery / pickup</span>
-        <span>Rs {{ quote.balanceRs }}</span>
+        <span>Rs {{ state.balanceRs() }}</span>
       </div>
     </div>
 
-    <a class="btn-whatsapp-confirm" [href]="sendToOumarHref" target="_blank" rel="noopener">
-      📱 Confirm My Order on WhatsApp
-    </a>
-    <p class="summary-hint">
-      Your complete order is pre-filled. We'll reply with payment details within minutes.
-    </p>
+    @if (orderError()) {
+      <p class="step__error">{{ orderError() }}</p>
+    }
 
-    @if (canSendCopyToSelf) {
-      <a class="btn-whatsapp-copy" [href]="sendToSelfHref" target="_blank" rel="noopener">
-        📋 Send Myself a Copy
+    @if (!orderResult()) {
+      <button
+        type="button"
+        class="btn-whatsapp-confirm"
+        [disabled]="orderLoading()"
+        (click)="confirmOrder()"
+      >
+        {{ orderLoading() ? 'Confirming your order…' : '✅ Confirm My Order' }}
+      </button>
+      <p class="summary-hint">
+        We'll save your order and open WhatsApp with everything pre-filled so we can confirm payment details.
+      </p>
+    } @else {
+      <p class="summary-hint">Order #{{ orderResult()!.orderId }} confirmed.</p>
+      <a class="btn-whatsapp-confirm" [href]="sendToOumarHref" target="_blank" rel="noopener">
+        📱 Confirm My Order on WhatsApp
       </a>
       <p class="summary-hint">
-        Opens a WhatsApp chat to your own number with this same summary, for your records.
+        Your complete order is pre-filled. We'll reply with payment details within minutes.
       </p>
+
+      @if (canSendCopyToSelf) {
+        <a class="btn-whatsapp-copy" [href]="sendToSelfHref" target="_blank" rel="noopener">
+          📋 Send Myself a Copy
+        </a>
+        <p class="summary-hint">
+          Opens a WhatsApp chat to your own number with this same summary, for your records.
+        </p>
+      }
     }
 
     <button type="button" class="btn-edit" (click)="editOrder()">← Edit my order</button>
   </div>
 }
+

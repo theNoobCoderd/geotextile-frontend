@@ -32,8 +32,8 @@ export class StepProductRollComponent {
     return product.pricePerM2;
   }
 
-  protected selectProduct(gsm: 150 | 200): void {
-    if (this.state.product().gsm === gsm) return;
+  protected selectProduct(gsm: 150 | 200 | null): void {
+    if (!gsm || this.state.product().gsm === gsm) return;
     this.state.updateProduct({ gsm, rollWidthM: null });
   }
 

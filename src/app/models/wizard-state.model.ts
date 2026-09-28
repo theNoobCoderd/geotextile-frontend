@@ -29,23 +29,37 @@ export interface ContactDetails {
 /** Client-side geometry preview for one roll width, shown while picking Step 2. */
 export interface RollCutOption {
   widthM: number;
-  inStock: boolean;
+  inStock: boolean; // always true — backend doesn't return per-width stock info
   linearMetersNeeded: number;
   billableAreaM2: number;
   extraM2: number; // waste above the recommended area
   isLeastWaste: boolean;
 }
 
-/** Result of POST /api/quote — the single source of truth for pricing. */
+/**
+ * Result of POST /quote — the single source of truth for pricing, mirrored
+ * 1:1 from the edge function's JSON response (supabase/functions/quote).
+ * Field names intentionally match the API rather than earlier UI-only names.
+ */
 export interface QuoteResult {
-  billableAreaM2: number;
+  rawArea: number;
+  bufferPercent: number;
+  unitPrice: number;
   rollWidthM: number;
-  linearMetersNeeded: number;
-  pricePerM2: number;
-  isBulkRate: boolean;
-  subtotalRs: number;
-  deliveryCostRs: number;
-  grandTotalRs: number;
-  depositRs: number;
-  balanceRs: number;
+  fulfillmentMode: 'pickup' | 'delivery';
+  zone: string | null;
+  depositPercent: number;
+  bufferedArea: number;
+  materialLength: number;
+  materialArea: number;
+  subtotal: number;
+  deliveryFee: number;
+  grandTotal: number;
+  depositAmount: number;
+}
+
+/** Result of POST /create-order — the authoritative, persisted order. */
+export interface CreateOrderResult extends QuoteResult {
+  orderId: string;
+  whatsappLink: string;
 }

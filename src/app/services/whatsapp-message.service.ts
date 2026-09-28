@@ -27,16 +27,16 @@ export class WhatsappMessageService {
       `━━━━━━━━━━━━━━━━━━━━`,
       `Product: ${product.gsm}gsm — ${product.name}`,
       `Cut: ${rollWidthM}m roll x ${linearMetersNeeded}m = ${billableAreaM2}m²`,
-      `Rate: Rs ${quote.pricePerM2}/m²${quote.isBulkRate ? ' (bulk rate)' : ''}`,
-      `Subtotal: Rs ${quote.subtotalRs}`,
+      `Rate: Rs ${quote.unitPrice}/m²`,
+      `Subtotal: Rs ${quote.subtotal}`,
       `━━━━━━━━━━━━━━━━━━━━`,
       delivery.mode === 'delivery'
-        ? `Delivery: ${zone?.label ?? 'zone TBC'} — Rs ${quote.deliveryCostRs}\nAddress: ${delivery.address.trim()}`
+        ? `Delivery: ${zone?.label ?? 'zone TBC'} — Rs ${quote.deliveryFee}\nAddress: ${delivery.address.trim()}`
         : `Pickup at Tribeca — Free`,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `TOTAL: Rs ${quote.grandTotalRs}`,
-      `DEPOSIT (30%): Rs ${quote.depositRs}`,
-      `BALANCE: Rs ${quote.balanceRs}`,
+      `TOTAL: Rs ${quote.grandTotal}`,
+      `DEPOSIT (${quote.depositPercent}%): Rs ${quote.depositAmount}`,
+      `BALANCE: Rs ${Math.round((quote.grandTotal - quote.depositAmount) * 100) / 100}`,
       contact.notes.trim() ? `━━━━━━━━━━━━━━━━━━━━\nNotes: ${contact.notes.trim()}` : null,
       `━━━━━━━━━━━━━━━━━━━━`,
       `Via geotextilemauritius.mu`,

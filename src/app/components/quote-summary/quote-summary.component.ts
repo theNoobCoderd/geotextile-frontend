@@ -46,13 +46,13 @@ export class QuoteSummaryComponent {
           cut.extraM2 > 0 ? ` (+${cut.extraM2}m²)` : ' (exact fit)'
         }`,
       },
-      { label: 'Rate', value: `Rs ${quote.pricePerM2}/m²${quote.isBulkRate ? ' (bulk rate)' : ''}` },
-      { label: 'Subtotal', value: `Rs ${quote.subtotalRs}` },
+      { label: 'Rate', value: `Rs ${quote.unitPrice}/m²` },
+      { label: 'Subtotal', value: `Rs ${quote.subtotal}` },
       delivery.mode === 'pickup'
         ? { label: 'Pickup', value: 'Tribeca — Free' }
         : {
             label: 'Delivery',
-            value: `${zone?.label ?? ''} — ${quote.deliveryCostRs === 0 ? 'Free' : 'Rs ' + quote.deliveryCostRs}`,
+            value: `${zone?.label ?? ''} — ${quote.deliveryFee === 0 ? 'Free' : 'Rs ' + quote.deliveryFee}`,
           },
     ];
 
@@ -81,9 +81,18 @@ export class QuoteSummaryComponent {
     });
   });
 
+  protected readonly orderResult = computed(() => this.state.orderResult());
+  protected readonly orderLoading = computed(() => this.state.orderLoading());
+  protected readonly orderError = computed(() => this.state.orderError());
+
+  /** Triggers POST /create-order — the order is only persisted once this succeeds. */
+  protected confirmOrder(): void {
+    this.state.confirmOrder();
+  }
+
+  /** Real WhatsApp link returned by create-order, pre-filled server-side with the persisted order. */
   protected get sendToOumarHref(): string {
-    const message = this.orderMessage();
-    return message ? this.whatsapp.buildSendToOumarLink(message) : '#';
+    return this.orderResult()?.whatsappLink ?? '#';
   }
 
   protected get sendToSelfHref(): string {
