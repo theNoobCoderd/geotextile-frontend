@@ -1,8 +1,9 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { PricingApiService } from './pricing-api.service';
+import { CreateOrderApiRequest, PricingApiService, QuoteApiRequest } from './pricing-api.service';
 import { PricingCatalog, ProductOption } from '../models/pricing.model';
 import {
   ContactDetails,
+  CreateOrderResult,
   DeliverySelection,
   ProductSelection,
   QuoteResult,
@@ -45,6 +46,10 @@ export class WizardStateService {
   readonly quoteLoading = signal(false);
   readonly quoteError = signal<string | null>(null);
 
+  readonly orderResult = signal<CreateOrderResult | null>(null);
+  readonly orderLoading = signal(false);
+  readonly orderError = signal<string | null>(null);
+
   /** Raw area before buffer is applied — either L x W or the direct entry. */
   readonly rawAreaM2 = computed(() => {
     const s = this.surfaceArea();
@@ -68,35 +73,36 @@ export class WizardStateService {
   });
 
   /**
-   * Cut preview for EVERY roll width the selected product ships in — not
-   * just the chosen one. Step 2 shows all of them side by side (with
-   * "least waste" / "out of stock" badges) so the customer can compare
-   * before picking, same as the reference design.
+   * Cut preview for EVERY globally active roll width — the backend
+   * (roll_widths table) doesn't scope roll widths per product, so every
+   * product can be cut from any of them. Step 2 shows all of them side by
+   * side (with a "least waste" badge) so the customer can compare before
+   * picking, same as the reference design.
    */
   readonly rollCutOptions = computed<RollCutOption[]>(() => {
-    const product = this.selectedProductOption();
+    const cat = this.catalog();
     const area = this.recommendedAreaM2();
-    if (!product || !area) return [];
+    if (!cat || !area) return [];
 
-    const raw = product.rolls.map((roll) => {
-      const linearMetersNeeded = Math.ceil(area / roll.widthM);
-      const billableAreaM2 = roll.widthM * linearMetersNeeded;
+    const raw = cat.rollWidths.map((widthM) => {
+      const linearMetersNeeded = Math.ceil(area / widthM);
+      const billableAreaM2 = widthM * linearMetersNeeded;
       return {
-        widthM: roll.widthM,
-        inStock: roll.inStock,
+        widthM,
+        inStock: true, // backend returns no per-width stock info
         linearMetersNeeded,
         billableAreaM2,
         extraM2: billableAreaM2 - area,
       };
     });
 
-    const inStockExtras = raw.filter((r) => r.inStock).map((r) => r.extraM2);
-    const minExtra = inStockExtras.length ? Math.min(...inStockExtras) : -1;
-    const hasVariation = new Set(inStockExtras).size > 1;
+    const extras = raw.map((r) => r.extraM2);
+    const minExtra = extras.length ? Math.min(...extras) : -1;
+    const hasVariation = new Set(extras).size > 1;
 
     return raw.map((r) => ({
       ...r,
-      isLeastWaste: r.inStock && hasVariation && r.extraM2 === minExtra,
+      isLeastWaste: hasVariation && r.extraM2 === minExtra,
     }));
   });
 
@@ -107,17 +113,27 @@ export class WizardStateService {
     return this.rollCutOptions().find((r) => r.widthM === rollWidth) ?? null;
   });
 
+  /**
+   * Bulk status for any product is decided purely by the area entered on
+   * Step 1 (recommendedAreaM2) — it's settled the moment the customer
+   * clicks "Continue" there, so Step 2 can show the right rate on every
+   * product card immediately, before the customer has selected a product
+   * or roll width.
+   */
+  isBulkRateFor(opt: ProductOption): boolean {
+    return this.recommendedAreaM2() >= opt.bulkThresholdM2;
+  }
+
   readonly isBulkRate = computed(() => {
     const opt = this.selectedProductOption();
-    const cut = this.selectedRollCut();
-    if (!opt || !cut) return false;
-    return cut.billableAreaM2 >= opt.bulkThresholdM2;
+    if (!opt) return false;
+    return this.isBulkRateFor(opt);
   });
 
   readonly currentPricePerM2 = computed(() => {
     const opt = this.selectedProductOption();
     if (!opt) return 0;
-    return this.isBulkRate() ? opt.bulkPricePerM2 : opt.pricePerM2;
+    return this.isBulkRateFor(opt) ? opt.bulkPricePerM2 : opt.pricePerM2;
   });
 
   readonly productSubtotalRs = computed(() => {
@@ -139,8 +155,14 @@ export class WizardStateService {
     return cat.deliveryZones.find((z) => z.id === zoneId) ?? null;
   });
 
+  /** grandTotal - depositAmount — the API doesn't return balance directly. */
+  readonly balanceRs = computed(() => {
+    const q = this.quoteResult();
+    return q ? Math.round((q.grandTotal - q.depositAmount) * 100) / 100 : 0;
+  });
+
   loadCatalog(): void {
-    this.pricingApi.getPricingCatalogMock().subscribe({
+    this.pricingApi.getPricingCatalog().subscribe({
       next: (catalog) => this.catalog.set(catalog),
       error: () =>
         this.catalogError.set(
@@ -179,39 +201,95 @@ export class WizardStateService {
     this.contact.update((c) => ({ ...c, ...patch }));
   }
 
-  /** Calls the backend for the authoritative quote once Step 4 is complete. */
-  submitForQuote(): void {
+  /** Shared inputs for both /quote and /create-order — never includes any price/area math. */
+  private buildOrderInputs(): QuoteApiRequest | null {
     const p = this.product();
     const d = this.delivery();
+    const s = this.surfaceArea();
+
     if (!p.gsm || !p.rollWidthM) {
       this.quoteError.set('Select a product and roll width first.');
-      return;
+      return null;
     }
+
+    const useDirectArea = !!s.directM2 && s.directM2 > 0;
+    const fulfillmentMode = d.mode ?? 'pickup';
+
+    if (fulfillmentMode === 'delivery' && !d.zoneId) {
+      this.quoteError.set('Select a delivery zone first.');
+      return null;
+    }
+
+    return {
+      inputMode: useDirectArea ? 'direct_area' : 'dimensions',
+      lengthM: useDirectArea ? undefined : (s.lengthM ?? undefined),
+      widthM: useDirectArea ? undefined : (s.widthM ?? undefined),
+      areaM2: useDirectArea ? (s.directM2 ?? undefined) : undefined,
+      bufferPercent: s.buffer,
+      productType: `${p.gsm}gsm`,
+      rollWidthM: p.rollWidthM,
+      fulfillmentMode,
+      zone: fulfillmentMode === 'delivery' ? (d.zoneId ?? 'tribeca') : 'tribeca',
+    };
+  }
+
+  /** Calls the backend for the authoritative quote once Step 4 is complete. */
+  submitForQuote(): void {
+    const request = this.buildOrderInputs();
+    if (!request) return;
 
     this.quoteLoading.set(true);
     this.quoteError.set(null);
 
-    this.pricingApi
-      .calculateQuoteMock({
-        billableInputM2: this.recommendedAreaM2(),
-        buffer: this.surfaceArea().buffer,
-        gsm: p.gsm,
-        rollWidthM: p.rollWidthM,
-        deliveryZoneId: d.mode === 'delivery' ? d.zoneId : null,
-      })
-      .subscribe({
-        next: (result) => {
-          this.quoteResult.set(result);
-          this.quoteLoading.set(false);
-          this.nextStep();
-        },
-        error: () => {
-          this.quoteError.set(
-            'Could not calculate your quote. Please try again.',
-          );
-          this.quoteLoading.set(false);
-        },
-      });
+    this.pricingApi.calculateQuote(request).subscribe({
+      next: (result) => {
+        this.quoteResult.set(result);
+        this.quoteLoading.set(false);
+        this.nextStep();
+      },
+      error: () => {
+        this.quoteError.set(
+          'Could not calculate your quote. Please try again.',
+        );
+        this.quoteLoading.set(false);
+      },
+    });
+  }
+
+  /** Persists the order once the customer confirms on the quote summary screen. */
+  confirmOrder(): void {
+    const request = this.buildOrderInputs();
+    const c = this.contact();
+    const d = this.delivery();
+
+    if (!request) return;
+    if (!c.name.trim() || !c.phone.trim()) {
+      this.orderError.set('Your name and WhatsApp number are required.');
+      return;
+    }
+
+    this.orderLoading.set(true);
+    this.orderError.set(null);
+
+    const orderRequest: CreateOrderApiRequest = {
+      ...request,
+      customerName: c.name.trim(),
+      customerWhatsapp: c.phone.trim(),
+      neededBy: c.dateNeeded ?? undefined,
+      notes: c.notes.trim() || undefined,
+      deliveryAddress: d.mode === 'delivery' ? d.address.trim() || undefined : undefined,
+    };
+
+    this.pricingApi.createOrder(orderRequest).subscribe({
+      next: (result) => {
+        this.orderResult.set(result);
+        this.orderLoading.set(false);
+      },
+      error: () => {
+        this.orderError.set('Could not confirm your order. Please try again.');
+        this.orderLoading.set(false);
+      },
+    });
   }
 
   reset(): void {
@@ -222,5 +300,7 @@ export class WizardStateService {
     this.contact.set({ ...EMPTY_CONTACT });
     this.quoteResult.set(null);
     this.quoteError.set(null);
+    this.orderResult.set(null);
+    this.orderError.set(null);
   }
 }

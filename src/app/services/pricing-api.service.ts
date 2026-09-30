@@ -1,43 +1,112 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import {Observable, of} from 'rxjs';
-import { PricingCatalog } from '../models/pricing.model';
-import { QuoteResult } from '../models/wizard-state.model';
-import {MOCK_PRICING_CATALOG, mockQuoteResult} from '../mocks/pricing-catalog.mock';
+import { Observable, map } from 'rxjs';
+import { environment } from '../../environments/environment';
+import { ApiGetDetailsResponse, DeliveryZone, PricingCatalog, ProductOption } from '../models/pricing.model';
+import { CreateOrderResult, QuoteResult } from '../models/wizard-state.model';
+import {
+  STATIC_DEFAULT_DEPOSIT_PERCENT,
+  STATIC_FREE_DELIVERY_THRESHOLD_M2,
+  labelForZone,
+  metaForProductType,
+  parseGsm,
+} from '../config/product-meta.config';
 
-export interface QuoteRequest {
-  billableInputM2: number; // area the customer asked for, before cut rounding
-  buffer: number;          // 0 | 10 | 20
-  gsm: 150 | 200;
+/** Body sent to POST /quote — matches supabase/functions/quote/index.ts's QuoteRequest. */
+export interface QuoteApiRequest {
+  inputMode: 'dimensions' | 'direct_area';
+  lengthM?: number;
+  widthM?: number;
+  areaM2?: number;
+  bufferPercent?: 0 | 10 | 20;
+  productType: string;
   rollWidthM: number;
-  deliveryZoneId: string | null; // null when pickup
+  fulfillmentMode?: 'pickup' | 'delivery';
+  zone?: string;
+}
+
+/** Body sent to POST /create-order — matches supabase/functions/create-order/index.ts's CreateOrderRequest. */
+export interface CreateOrderApiRequest extends QuoteApiRequest {
+  customerName: string;
+  customerWhatsapp: string;
+  neededBy?: string;
+  notes?: string;
+  deliveryAddress?: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class PricingApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = '/api';
+  private readonly functionsUrl = environment.functionsUrl;
 
-  /** Fetched once when the wizard opens; drives Steps 2 and 3 previews. */
+  /** All edge functions require the Supabase publishable/anon key on every call. */
+  private readonly headers = new HttpHeaders({
+    'content-type': 'application/json',
+    apikey: environment.supabaseAnonKey,
+    authorization: `Bearer ${environment.supabaseAnonKey}`,
+  });
+
+  /**
+   * Fetched once when the wizard opens; drives the products/roll/delivery
+   * pickers. Calls the `get-details` edge function and merges the live
+   * numbers with static marketing/bulk-pricing config.
+   */
   getPricingCatalog(): Observable<PricingCatalog> {
-    return this.http.get<PricingCatalog>(`${this.baseUrl}/pricing`);
-  }
-
-  getPricingCatalogMock(): Observable<PricingCatalog> {
-    return of(MOCK_PRICING_CATALOG);
-  }
-
-  calculateQuoteMock(request: QuoteRequest): Observable<QuoteResult> {
-    return of(mockQuoteResult);
+    return this.http
+      .post<ApiGetDetailsResponse>(`${this.functionsUrl}/get-details`, { name: 'storefront' }, { headers: this.headers })
+      .pipe(map((raw) => this.toPricingCatalog(raw)));
   }
 
   /**
-   * Authoritative price calculation. Called when the customer reaches the
-   * quote screen — re-validates everything server-side in case the catalog
-   * changed since it was fetched, so the wizard never trusts its own math
-   * for the final number.
+   * Authoritative price calculation. Called when the customer clicks
+   * "See My Quote" — re-validates everything server-side so the wizard
+   * never trusts its own math for the final number.
    */
-  calculateQuote(request: QuoteRequest): Observable<QuoteResult> {
-    return this.http.post<QuoteResult>(`${this.baseUrl}/quote`, request);
+  calculateQuote(request: QuoteApiRequest): Observable<QuoteResult> {
+    return this.http.post<QuoteResult>(`${this.functionsUrl}/quote`, request, { headers: this.headers });
+  }
+
+  /**
+   * Persists the order once the customer confirms. The server recomputes
+   * price/area/deposit from scratch — nothing from the quote step is
+   * trusted, only re-sent as the customer's requested inputs.
+   */
+  createOrder(request: CreateOrderApiRequest): Observable<CreateOrderResult> {
+    return this.http.post<CreateOrderResult>(`${this.functionsUrl}/create-order`, request, { headers: this.headers });
+  }
+
+  private toPricingCatalog(raw: ApiGetDetailsResponse): PricingCatalog {
+    const products: ProductOption[] = (raw.products ?? []).map((row) => {
+      const meta = metaForProductType(row.product_type);
+      return {
+        productType: row.product_type,
+        gsm: parseGsm(row.product_type),
+        name: row.label || meta.name,
+        icon: meta.icon,
+        desc: meta.desc,
+        uses: meta.uses,
+        pricePerM2: Number(row.price_per_m2),
+        bulkPricePerM2: Number(row.bulk_price_per_m2),
+        bulkThresholdM2: Number(row.bulk_threshold_m2),
+      };
+    });
+
+    const rollWidths = (raw.rollWidths ?? [])
+      .map((row) => Number(row.width_m))
+      .sort((a, b) => a - b);
+
+    const deliveryZones: DeliveryZone[] = (raw.deliveryZones ?? []).map((row) => ({
+      id: row.zone,
+      label: labelForZone(row.zone),
+      costRs: Number(row.delivery_fee),
+    }));
+
+    return {
+      products,
+      rollWidths,
+      deliveryZones,
+      freeDeliveryThresholdM2: STATIC_FREE_DELIVERY_THRESHOLD_M2,
+      depositPercent: STATIC_DEFAULT_DEPOSIT_PERCENT,
+    };
   }
 }

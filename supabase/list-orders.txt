@@ -1,0 +1,116 @@
+// supabase/functions/list-orders/index.ts
+//
+// Admin-only: returns orders (optionally filtered by status) for the admin
+// dashboard. Requires a signed-in Supabase Auth user whose id is present in
+// the `admins` table (see supabase/admin-schema.sql). Uses the service-role
+// key so it can verify the caller's JWT and read `admins`/`orders` directly,
+// rather than depending on RLS alone — RLS is still enabled on those tables
+// as a second line of defense for any other client.
+//
+// Env vars required: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (set these as
+// Supabase Edge Function secrets — never ship the service-role key to the
+// browser).
+//
+// STATUS LIST NOTE: duplicated from update-order-status/index.ts on purpose
+// (see supabase/create-order.txt for why edge functions can't share
+// imports). Keep both in sync with the `orders.status` check constraint.
+
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const ORDER_STATUSES = [
+  "QUOTE_GENERATED",
+  "SENT_TO_WHATSAPP",
+  "DEPOSIT_PENDING",
+  "DEPOSIT_PAID",
+  "ORDERED_FROM_SUPPLIER",
+  "READY",
+  "FULFILLED",
+  "CANCELLED",
+];
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+);
+
+interface ListOrdersRequest {
+  status?: string; // one of ORDER_STATUSES, omitted/empty = all
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const jwt = authHeader.replace(/^Bearer\s+/i, "");
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Invalid or expired session" }), {
+        status: 401,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    const { data: adminRow, error: adminError } = await supabaseAdmin
+      .from("admins")
+      .select("user_id")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+
+    if (adminError || !adminRow) {
+      return new Response(JSON.stringify({ error: "Not authorized as admin" }), {
+        status: 403,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    const body = req.method === "POST" ? ((await req.json().catch(() => ({}))) as ListOrdersRequest) : {};
+
+    let query = supabaseAdmin
+      .from("orders")
+      .select(
+        "id, created_at, updated_at, status, customer_name, customer_whatsapp, notes, product_type, roll_width_m, material_area_m2, fulfillment_mode, zone, delivery_address, grand_total, deposit_percentage, deposit_amount",
+      )
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    if (body.status && ORDER_STATUSES.includes(body.status)) {
+      query = query.eq("status", body.status);
+    }
+
+    const { data: orders, error: ordersError } = await query;
+    if (ordersError) {
+      console.error(ordersError);
+      return new Response(JSON.stringify({ error: "Failed to load orders" }), {
+        status: 500,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ orders }), {
+      status: 200,
+      headers: { ...corsHeaders, "content-type": "application/json" },
+    });
+  } catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: "Internal error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "content-type": "application/json" },
+    });
+  }
+});

@@ -1,0 +1,207 @@
+// supabase/functions/quote/index.ts
+//
+// Pure quote calculation. No writes. Talks to Postgres directly over the
+// `postgres` Deno driver (plain SQL) rather than Supabase's JS client/PostgREST,
+// so this function can be redeployed standalone on EC2 (or ported 1:1 into a
+// Spring Boot controller) later with no rewrite.
+//
+// Pricing chain:
+//   rawArea        = inputMode 'dimensions' ? length * width : directAreaM2
+//   bufferedArea    = rawArea * (1 + bufferPercent / 100)          // 0 | 10 | 20
+//   materialLength  = ceil(bufferedArea / rollWidth)                // whole-meter cutting increment
+//   materialArea    = rollWidth * materialLength                    // this is what's BILLED (includes roll waste)
+//   unitPrice       = product_catalog.price_per_m2 for productType
+//   subtotal        = materialArea * unitPrice
+//   deliveryFee     = fulfillmentMode === 'delivery' ? delivery_zone_pricing.delivery_fee for zone : 0
+//   grandTotal      = subtotal + deliveryFee
+//   depositPercent  = app_settings.deposit_percentage
+//   depositAmount   = round(grandTotal * depositPercent / 100)
+//
+// Env vars required: DATABASE_URL (Transaction pooler connection string).
+
+import postgres from "npm:postgres";
+
+const sql = postgres(Deno.env.get("DATABASE_URL")!, { max: 1 });
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+interface QuoteRequest {
+  inputMode: "dimensions" | "direct_area";
+  lengthM?: number;
+  widthM?: number;
+  areaM2?: number;
+  bufferPercent?: 0 | 10 | 20;
+  productType: string;
+  rollWidthM: number;
+  fulfillmentMode?: "pickup" | "delivery";
+  zone?: string; // required only when fulfillmentMode === 'delivery'
+}
+
+// Pure functions: kept dependency-free so they're trivially portable.
+export function computeRawArea(req: QuoteRequest): number {
+  if (req.inputMode === "dimensions") {
+    return (req.lengthM ?? 0) * (req.widthM ?? 0);
+  }
+  return req.areaM2 ?? 0;
+}
+
+export function computePricing(params: {
+  rawArea: number;
+  bufferPercent: number;
+  rollWidthM: number;
+  unitPrice: number;
+  bulkUnitPrice: number | null;
+  bulkThresholdM2: number;
+  fulfillmentMode: "pickup" | "delivery";
+  deliveryFee: number;
+  depositPercent: number;
+}) {
+  const bufferedArea = params.rawArea * (1 + params.bufferPercent / 100);
+  const materialLength = Math.ceil(bufferedArea / params.rollWidthM); // whole meters
+  const materialArea = params.rollWidthM * materialLength;
+
+  // Tier is decided on the BILLED area. Rounded to avoid float noise (e.g. 99.99999999).
+  const bulkApplied =
+    params.bulkUnitPrice !== null &&
+    Math.round(materialArea * 100) / 100 >= params.bulkThresholdM2;
+  const appliedUnitPrice = bulkApplied ? params.bulkUnitPrice! : params.unitPrice;
+
+  const subtotal = materialArea * appliedUnitPrice;
+  const deliveryFee = params.fulfillmentMode === "delivery" ? params.deliveryFee : 0;
+  const grandTotal = subtotal + deliveryFee;
+  const depositAmount = Math.round(grandTotal * (params.depositPercent / 100) * 100) / 100;
+
+  return { bufferedArea, materialLength, materialArea,
+    appliedUnitPrice, bulkApplied,
+    subtotal, deliveryFee, grandTotal, depositAmount };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: corsHeaders,
+    });
+  }
+
+
+  try {
+    const body = (await req.json()) as QuoteRequest;
+    const fulfillmentMode = body.fulfillmentMode ?? "pickup";
+    const bufferPercent = body.bufferPercent ?? 0;
+
+    if (!body.inputMode || !body.productType || !body.rollWidthM) {
+      return new Response(
+        JSON.stringify({ error: "inputMode, productType and rollWidthM are required" }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    const rawArea = computeRawArea(body);
+    if (!rawArea || rawArea <= 0) {
+      return new Response(
+        JSON.stringify({ error: "Could not derive a positive area from the given input" }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    if (fulfillmentMode === "delivery" && !body.zone) {
+      return new Response(
+        JSON.stringify({ error: "zone is required when fulfillmentMode is 'delivery'" }),
+        { status: 400, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    // Validate roll width is one of the allowed active widths
+    const rollRows = await sql`
+      select width_m from roll_widths where width_m = ${body.rollWidthM} and active = true limit 1
+    `;
+    if (rollRows.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "That roll width is not currently available" }),
+        { status: 404, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    const productRows = await sql`
+      select price_per_m2, bulk_price_per_m2, bulk_threshold_m2
+      from product_catalog
+      where product_type = ${body.productType} and active = true limit 1
+    `;
+    if (productRows.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Unknown or inactive productType" }),
+        { status: 404, headers: { "content-type": "application/json" } },
+      );
+    }
+    const unitPrice = Number(productRows[0].price_per_m2);
+    const bulkUnitPrice = productRows[0].bulk_price_per_m2 !== null ? Number(productRows[0].bulk_price_per_m2) : null;
+    const bulkThresholdM2 = Number(productRows[0].bulk_threshold_m2 ?? 100);
+
+    let deliveryFee = 0;
+    if (fulfillmentMode === "delivery") {
+      const zoneRows = await sql`
+        select delivery_fee from delivery_zone_pricing where zone = ${body.zone} and active = true limit 1
+      `;
+      if (zoneRows.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "No active delivery fee for that zone" }),
+          { status: 404, headers: { "content-type": "application/json" } },
+        );
+      }
+      deliveryFee = Number(zoneRows[0].delivery_fee);
+    }
+
+    const settingsRows = await sql`
+      select value from app_settings where key = 'deposit_percentage' limit 1
+    `;
+    const depositPercent = settingsRows.length > 0 ? Number(settingsRows[0].value) : 30;
+
+    const pricing = computePricing({
+      rawArea,
+      bufferPercent,
+      rollWidthM: body.rollWidthM,
+      unitPrice,
+      bulkUnitPrice,
+      bulkThresholdM2,
+      fulfillmentMode,
+      deliveryFee,
+      depositPercent,
+    });
+
+    console.log(JSON.stringify({
+      rawArea,
+      bufferPercent,
+      unitPrice,
+      rollWidthM: body.rollWidthM,
+      fulfillmentMode,
+      zone: body.zone ?? null,
+      depositPercent,
+      ...pricing,
+    }));
+
+    return new Response(
+      JSON.stringify({
+        rawArea,
+        bufferPercent,
+        unitPrice,
+        rollWidthM: body.rollWidthM,
+        fulfillmentMode,
+        zone: body.zone ?? null,
+        depositPercent,
+        ...pricing,
+      }),
+      { status: 200, headers: {...corsHeaders, "content-type": "application/json" } },
+    );
+  } catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: "Internal error" }), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
+  }
+});

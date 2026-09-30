@@ -18,7 +18,7 @@
           <div class="product-card__price">
             <div class="product-card__price-value">Rs {{ priceForProduct(product) }}</div>
             <div class="product-card__price-label">
-              per m²{{ state.product().gsm === product.gsm && state.isBulkRate() ? ' (bulk)' : '' }}
+              per m²{{ isBulkForProduct(product) ? ' (bulk)' : '' }}
             </div>
           </div>
         </div>

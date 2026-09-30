@@ -1,0 +1,223 @@
+// supabase/functions/create-order/index.ts
+//
+// Creates an order row with a SERVER-RECOMPUTED price (never trusts any price,
+// area, or deposit figure sent by the client). Talks to Postgres directly
+// (plain SQL), not the Supabase JS client, so this is portable to EC2/Spring
+// Boot later without a rewrite. Insert triggers 0001_schema.sql's audit
+// trigger, which writes the first order_status_history row automatically.
+//
+// NOTE: pricing logic is duplicated (not imported) from quote/index.ts on
+// purpose -- the Supabase dashboard's inline editor deploys one file per
+// function and can't resolve relative imports across functions. Keep both
+// copies in sync if you change the pricing chain.
+//
+// Env vars required: DATABASE_URL (Transaction pooler connection string).
+
+import postgres from "npm:postgres";
+
+const sql = postgres(Deno.env.get("DATABASE_URL")!, { max: 1 });
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+interface CreateOrderRequest {
+  customerName: string;
+  customerWhatsapp: string;
+  neededBy?: string; // ISO date string, optional
+  notes?: string;
+
+  inputMode: "dimensions" | "direct_area";
+  lengthM?: number;
+  widthM?: number;
+  areaM2?: number;
+  bufferPercent?: 0 | 10 | 20;
+
+  productType: string;
+  rollWidthM: number;
+
+  fulfillmentMode?: "pickup" | "delivery";
+  zone?: string; // required only when fulfillmentMode === 'delivery'
+  deliveryAddress?: string;
+}
+
+function computeRawArea(req: CreateOrderRequest): number {
+  if (req.inputMode === "dimensions") {
+    return (req.lengthM ?? 0) * (req.widthM ?? 0);
+  }
+  return req.areaM2 ?? 0;
+}
+
+function computePricing(params: {
+  materialArea: number;
+  materialLength: number;
+  bufferedArea: number;
+  appliedUnitPrice: number;
+  bulkApplied: boolean;
+  fulfillmentMode: "pickup" | "delivery";
+  deliveryFee: number;
+  depositPercent: number;
+}) {
+  const subtotal = params.materialArea * params.appliedUnitPrice;
+  const deliveryFee = params.fulfillmentMode === "delivery" ? params.deliveryFee : 0;
+  const grandTotal = subtotal + deliveryFee;
+  const depositAmount = Math.round(grandTotal * (params.depositPercent / 100) * 100) / 100;
+
+  return { bufferedArea: params.bufferedArea, materialLength: params.materialLength, materialArea: params.materialArea,
+    appliedUnitPrice: params.appliedUnitPrice, bulkApplied: params.bulkApplied,
+    subtotal, deliveryFee, grandTotal, depositAmount };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      headers: corsHeaders,
+    });
+  }
+
+  try {
+    const body = (await req.json()) as CreateOrderRequest;
+    const fulfillmentMode = body.fulfillmentMode ?? "pickup";
+    const bufferPercent = body.bufferPercent ?? 0;
+
+    if (!body.customerName || !body.customerWhatsapp || !body.inputMode || !body.productType || !body.rollWidthM) {
+      return new Response(
+        JSON.stringify({
+          error: "customerName, customerWhatsapp, inputMode, productType and rollWidthM are required",
+        }),
+        { status: 400, headers: {...corsHeaders, "content-type": "application/json" } },
+      );
+    }
+
+    const rawArea = computeRawArea(body);
+    if (!rawArea || rawArea <= 0) {
+      return new Response(
+        JSON.stringify({ error: "Could not derive a positive area from the given input" }),
+        { status: 400, headers: {...corsHeaders, "content-type": "application/json" } },
+      );
+    }
+
+    if (fulfillmentMode === "delivery" && !body.zone) {
+      return new Response(
+        JSON.stringify({ error: "zone is required when fulfillmentMode is 'delivery'" }),
+        { status: 400, headers: {...corsHeaders, "content-type": "application/json" } },
+      );
+    }
+
+    // Re-validate roll width against active offerings
+    const rollRows = await sql`
+      select width_m from roll_widths where width_m = ${body.rollWidthM} and active = true limit 1
+    `;
+    if (rollRows.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "That roll width is not currently available" }),
+        { status: 404, headers: {...corsHeaders, "content-type": "application/json" } },
+      );
+    }
+
+    // Re-derive unit price server-side. Never accept a price field from the client.
+    const productRows = await sql`
+      select price_per_m2, bulk_price_per_m2, bulk_threshold_m2
+      from product_catalog
+      where product_type = ${body.productType} and active = true limit 1
+    `;
+    if (productRows.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Unknown or inactive productType" }),
+        { status: 404, headers: {...corsHeaders, "content-type": "application/json" } },
+      );
+    }
+
+    const unitPrice = Number(productRows[0].price_per_m2);
+    const bulkUnitPrice = productRows[0].bulk_price_per_m2 !== null ? Number(productRows[0].bulk_price_per_m2) : null;
+    const bulkThresholdM2 = Number(productRows[0].bulk_threshold_m2 ?? 100);
+
+    let deliveryFee = 0;
+    if (fulfillmentMode === "delivery") {
+      const zoneRows = await sql`
+        select delivery_fee from delivery_zone_pricing where zone = ${body.zone} and active = true limit 1
+      `;
+      if (zoneRows.length === 0) {
+        return new Response(
+          JSON.stringify({ error: "No active delivery fee for that zone" }),
+          { status: 404, headers: {...corsHeaders, "content-type": "application/json" } },
+        );
+      }
+      deliveryFee = Number(zoneRows[0].delivery_fee);
+    }
+
+    const settingsRows = await sql`
+      select value from app_settings where key = 'deposit_percentage' limit 1
+    `;
+    const depositPercent = settingsRows.length > 0 ? Number(settingsRows[0].value) : 30;
+
+    // Tier is decided on the BILLED area. Rounded to avoid float noise (e.g. 99.99999999).
+    const bufferedArea = rawArea * (1 + bufferPercent / 100);
+    const materialLength = Math.ceil(bufferedArea / body.rollWidthM); // whole meters
+    const materialArea = body.rollWidthM * materialLength;
+
+    const bulkApplied =
+      bulkUnitPrice !== null && Math.round(materialArea * 100) / 100 >= bulkThresholdM2;
+    const appliedUnitPrice = bulkApplied ? bulkUnitPrice! : unitPrice;
+
+    const pricing = computePricing({
+      materialArea,
+      materialLength,
+      bufferedArea,
+      appliedUnitPrice,
+      bulkApplied,
+      fulfillmentMode,
+      deliveryFee,
+      depositPercent,
+    });
+
+    const inserted = await sql`
+      insert into orders (
+        customer_name, customer_whatsapp, notes,
+        input_mode, length_m, width_m, raw_area_m2, buffer_percent,
+        product_type, unit_price_per_m2, roll_width_m,
+        buffered_area_m2, material_length_m, material_area_m2, sub_total,
+        fulfillment_mode, zone, delivery_address, delivery_fee,
+        grand_total, total_price, deposit_percentage, deposit_amount
+      ) values (
+        ${body.customerName}, ${body.customerWhatsapp}, ${body.notes ?? null},
+        ${body.inputMode}, ${body.lengthM ?? null}, ${body.widthM ?? null}, ${rawArea}, ${bufferPercent},
+        ${body.productType}, ${appliedUnitPrice}, ${body.rollWidthM},
+        ${pricing.bufferedArea}, ${pricing.materialLength}, ${pricing.materialArea}, ${pricing.subtotal},
+        ${fulfillmentMode}, ${body.zone ?? null}, ${body.deliveryAddress ?? null}, ${pricing.deliveryFee},
+        ${pricing.grandTotal}, ${pricing.grandTotal}, ${depositPercent}, ${pricing.depositAmount}
+      )
+      returning id
+    `;
+
+    const orderId = inserted[0].id as string;
+
+    const waMessage = encodeURIComponent(
+      `New order request:\nOrder #${orderId}\nProduct: ${body.productType}\nRoll width: ${body.rollWidthM}m\n` +
+      `Material area (billed): ${pricing.materialArea}m²\nFulfillment: ${fulfillmentMode}${body.zone ? ` (${body.zone})` : ""}\n` +
+      `Grand total: ${pricing.grandTotal}\nDeposit (${depositPercent}%): ${pricing.depositAmount}\nName: ${body.customerName}`,
+    );
+    // Replace with your business WhatsApp number, digits only, country code first.
+    const whatsappLink = `https://wa.me/+23059335318?text=${waMessage}`;
+
+    return new Response(
+      JSON.stringify({
+        orderId,
+        unitPrice,
+        ...pricing,
+        depositPercent,
+        whatsappLink,
+      }),
+      { status: 201, headers: {...corsHeaders, "content-type": "application/json" } },
+    );
+  } catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: "Internal error" }), {
+      status: 500,
+      headers: {...corsHeaders, "content-type": "application/json" },
+    });
+  }
+});

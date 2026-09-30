@@ -1,0 +1,159 @@
+@use '../../../styles/tokens' as *;
+
+.admin {
+  min-height: 100vh;
+  background: var(--gtx-chalk);
+  padding: 1.5rem;
+  font-family: var(--gtx-font-body);
+}
+
+.admin__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin__title {
+  @include gtx-heading;
+  font-size: 1.75rem;
+  margin: 0;
+}
+
+.admin__subtitle {
+  color: var(--gtx-muted);
+  margin: 0.25rem 0 0;
+}
+
+.admin__signout {
+  background: var(--gtx-white);
+  border: 1px solid var(--gtx-border);
+  border-radius: var(--gtx-radius-sm);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+
+  &:hover {
+    background: var(--gtx-sand);
+  }
+}
+
+.admin__toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.admin__filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+
+  select {
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--gtx-border);
+    border-radius: var(--gtx-radius-sm);
+    min-width: 180px;
+  }
+}
+
+.admin__refresh {
+  background: var(--gtx-emerald);
+  color: var(--gtx-white);
+  border: none;
+  border-radius: var(--gtx-radius-sm);
+  padding: 0.55rem 1.1rem;
+  cursor: pointer;
+  font-weight: 600;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.admin__error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--gtx-radius-sm);
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.admin__empty {
+  color: var(--gtx-muted);
+}
+
+.admin__table-wrap {
+  overflow-x: auto;
+  background: var(--gtx-white);
+  border: 1px solid var(--gtx-border);
+  border-radius: var(--gtx-radius-lg);
+}
+
+.admin__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+
+  th,
+  td {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--gtx-border);
+    white-space: nowrap;
+  }
+
+  th {
+    @include gtx-eyebrow;
+    background: var(--gtx-mint-tint);
+  }
+
+  select {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--gtx-border);
+    border-radius: var(--gtx-radius-sm);
+  }
+}
+
+.admin__order-id {
+  display: block;
+  font-weight: 600;
+}
+
+.admin__order-date,
+.admin__muted {
+  color: var(--gtx-muted);
+  font-size: 0.8rem;
+}
+
+.admin__status {
+  @include gtx-pill;
+  display: inline-block;
+  padding: 0.3rem 0.65rem;
+  background: var(--gtx-mint-fill);
+  color: var(--gtx-emerald);
+
+  &--cancelled {
+    background: #fef2f2;
+    color: #b91c1c;
+  }
+
+  &--fulfilled {
+    background: var(--gtx-mint-fill);
+    color: var(--gtx-forest);
+  }
+
+  &--deposit_pending,
+  &--quote_generated,
+  &--sent_to_whatsapp {
+    background: #fff7ed;
+    color: #c2410c;
+  }
+}
