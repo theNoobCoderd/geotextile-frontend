@@ -1,0 +1,96 @@
+<div class="admin">
+  <header class="admin__header">
+    <div>
+      <h1 class="admin__title">Orders</h1>
+      <p class="admin__subtitle">Track payments and delivery status.</p>
+    </div>
+    <button type="button" class="admin__signout" (click)="signOut()">Sign out</button>
+  </header>
+
+  <div class="admin__toolbar">
+    <label class="admin__filter">
+      <span>Status</span>
+      <select
+        [ngModel]="statusFilter()"
+        (ngModelChange)="onFilterChange($event)"
+      >
+        <option value="ALL">All</option>
+        @for (status of statuses; track status) {
+          <option [value]="status">{{ statusLabels[status] }}</option>
+        }
+      </select>
+    </label>
+    <button type="button" class="admin__refresh" (click)="refresh()" [disabled]="loading()">
+      {{ loading() ? 'Loading…' : 'Refresh' }}
+    </button>
+  </div>
+
+  @if (error()) {
+    <p class="admin__error">{{ error() }}</p>
+  }
+
+  @if (loading() && orders().length === 0) {
+    <p class="admin__empty">Loading orders…</p>
+  } @else if (orders().length === 0) {
+    <p class="admin__empty">No orders found.</p>
+  } @else {
+    <div class="admin__table-wrap">
+      <table class="admin__table">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Product</th>
+            <th>Fulfillment</th>
+            <th>Total (Rs)</th>
+            <th>Deposit (Rs)</th>
+            <th>Status</th>
+            <th>Update</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (order of orders(); track order.id) {
+            <tr>
+              <td>
+                <div>{{ order.customer_name }}</div>
+                <div class="admin__muted">{{ order.customer_whatsapp }}</div>
+              </td>
+              <td>
+                <div>{{ order.product_type }}</div>
+                <div class="admin__muted">{{ order.material_area_m2 }} m² · roll {{ order.roll_width_m }}m</div>
+              </td>
+              <td>
+                <div>{{ order.fulfillment_mode }}</div>
+                @if (order.fulfillment_mode === 'delivery') {
+                  <div class="admin__muted">{{ order.zone }}</div>
+                }
+              </td>
+              <td>{{ order.grand_total }}</td>
+              <td>{{ order.deposit_amount }} ({{ order.deposit_percentage }}%)</td>
+              <td>
+                <span class="admin__status admin__status--{{ order.status.toLowerCase() }}">
+                  {{ statusLabels[order.status] }}
+                </span>
+              </td>
+              <td>
+                @if (nextStatusOptions[order.status].length > 0) {
+                  <select
+                    [ngModel]="order.status"
+                    [disabled]="updatingOrderId() === order.id"
+                    (ngModelChange)="changeStatus(order, $event)"
+                  >
+                    <option [value]="order.status">{{ statusLabels[order.status] }}</option>
+                    @for (next of nextStatusOptions[order.status]; track next) {
+                      <option [value]="next">→ {{ statusLabels[next] }}</option>
+                    }
+                  </select>
+                } @else {
+                  <span class="admin__muted">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

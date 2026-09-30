@@ -229,7 +229,7 @@ export class WizardStateService {
       productType: `${p.gsm}gsm`,
       rollWidthM: p.rollWidthM,
       fulfillmentMode,
-      zone: fulfillmentMode === 'delivery' ? (d.zoneId ?? undefined) : undefined,
+      zone: fulfillmentMode === 'delivery' ? (d.zoneId ?? 'tribeca') : 'tribeca',
     };
   }
 

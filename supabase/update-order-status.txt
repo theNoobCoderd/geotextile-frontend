@@ -1,0 +1,132 @@
+// supabase/functions/update-order-status/index.ts
+//
+// Admin-only: moves an order to a new status (e.g. mark deposit received,
+// mark delivered). Requires a signed-in Supabase Auth user whose id is in
+// the `admins` table (see supabase/admin-schema.sql). The DB trigger
+// fn_orders_status_audit (existing in your schema) automatically inserts
+// the corresponding order_status_history row and bumps updated_at — this
+// function only needs to write the new status.
+//
+// Env vars required: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+//
+// STATUS LIST NOTE: duplicated from list-orders/index.ts on purpose (see
+// supabase/create-order.txt for why edge functions can't share imports).
+// Keep both in sync with the `orders.status` check constraint.
+
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const ORDER_STATUSES = [
+  "QUOTE_GENERATED",
+  "SENT_TO_WHATSAPP",
+  "DEPOSIT_PENDING",
+  "DEPOSIT_PAID",
+  "ORDERED_FROM_SUPPLIER",
+  "READY",
+  "FULFILLED",
+  "CANCELLED",
+];
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+);
+
+interface UpdateOrderStatusRequest {
+  orderId: string;
+  newStatus: string;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const jwt = authHeader.replace(/^Bearer\s+/i, "");
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Invalid or expired session" }), {
+        status: 401,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    const { data: adminRow, error: adminError } = await supabaseAdmin
+      .from("admins")
+      .select("user_id")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+
+    if (adminError || !adminRow) {
+      return new Response(JSON.stringify({ error: "Not authorized as admin" }), {
+        status: 403,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    const body = (await req.json()) as UpdateOrderStatusRequest;
+
+    if (!body.orderId || !body.newStatus) {
+      return new Response(JSON.stringify({ error: "orderId and newStatus are required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    if (!ORDER_STATUSES.includes(body.newStatus)) {
+      return new Response(JSON.stringify({ error: "Invalid newStatus" }), {
+        status: 400,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from("orders")
+      .update({ status: body.newStatus })
+      .eq("id", body.orderId)
+      .select(
+        "id, created_at, updated_at, status, customer_name, customer_whatsapp, notes, product_type, roll_width_m, material_area_m2, fulfillment_mode, zone, delivery_address, grand_total, deposit_percentage, deposit_amount",
+      )
+      .maybeSingle();
+
+    if (updateError) {
+      console.error(updateError);
+      return new Response(JSON.stringify({ error: "Failed to update order" }), {
+        status: 500,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    if (!updated) {
+      return new Response(JSON.stringify({ error: "Order not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "content-type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ order: updated }), {
+      status: 200,
+      headers: { ...corsHeaders, "content-type": "application/json" },
+    });
+  } catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: "Internal error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "content-type": "application/json" },
+    });
+  }
+});

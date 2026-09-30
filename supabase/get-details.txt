@@ -1,0 +1,41 @@
+// Setup type definitions for built-in Supabase Runtime APIs
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { withSupabase } from "jsr:@supabase/server@^1";
+
+interface ReqPayload {
+  name: string;
+}
+
+console.info("server started");
+
+export default {
+  fetch: withSupabase({ auth: ["publishable", "secret"] }, async (req, ctx) => {
+    const { name }: ReqPayload = await req.json();
+
+    // Using 'sb_secret_xyz' bypasses RLS — use for privileged operations
+    if (ctx.authMode === "secret") {
+      return Response.json({
+        message: `Hello ${name} admin!`,
+      });
+    }
+
+    const { data: products, error: productsCatalogError } = await ctx.supabaseAdmin
+      .from("product_catalog")
+      .select("product_type, label, price_per_m2, bulk_price_per_m2,  bulk_threshold_m2");
+
+    const { data: rollWidths, error: rollWidthsError } = await ctx.supabaseAdmin
+      .from("roll_widths")
+      .select("width_m");
+
+    const { data: deliveryZones, error: deliveryZonesError } = await ctx.supabaseAdmin
+      .from("delivery_zone_pricing")
+      .select("zone, delivery_fee");
+
+
+    return Response.json({
+      products: products,
+      rollWidths: rollWidths,
+      deliveryZones: deliveryZones
+    });
+  }),
+};
