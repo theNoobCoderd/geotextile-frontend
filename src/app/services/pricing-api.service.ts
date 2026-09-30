@@ -75,6 +75,17 @@ export class PricingApiService {
     return this.http.post<CreateOrderResult>(`${this.functionsUrl}/create-order`, request, { headers: this.headers });
   }
 
+  /**
+   * Cancels a previously-confirmed order — used when the customer goes back
+   * to "Edit my order" after already confirming once, so the abandoned
+   * order doesn't sit around forever as QUOTE_GENERATED/SENT_TO_WHATSAPP.
+   */
+  cancelOrder(orderId: string): Observable<void> {
+    return this.http
+      .post(`${this.functionsUrl}/cancel-order`, { orderId }, { headers: this.headers })
+      .pipe(map(() => undefined));
+  }
+
   private toPricingCatalog(raw: ApiGetDetailsResponse): PricingCatalog {
     const products: ProductOption[] = (raw.products ?? []).map((row) => {
       const meta = metaForProductType(row.product_type);

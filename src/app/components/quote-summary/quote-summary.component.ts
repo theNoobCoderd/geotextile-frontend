@@ -108,8 +108,8 @@ export class QuoteSummaryComponent {
     return this.whatsapp.hasUsablePhone(this.state.contact().phone);
   }
 
-  /** Goes back to Step 1 to edit — deliberately doesn't clear anything, unlike reset(). */
+  /** Goes back to Step 1 to edit — clears the previous quote/order result so a new one must be confirmed. */
   protected editOrder(): void {
-    this.state.goToStep(1);
+    this.state.editOrder();
   }
 }

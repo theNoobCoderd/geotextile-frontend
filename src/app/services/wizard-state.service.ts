@@ -292,6 +292,35 @@ export class WizardStateService {
     });
   }
 
+  /**
+   * Sends the customer back to Step 1 to change their order. Unlike
+   * reset(), this keeps their inputs (product, surface area, contact...)
+   * so they can tweak rather than start over. If an order was already
+   * confirmed (orderResult set), it's cancelled server-side first — editing
+   * always means "this order is abandoned, a new one will be created"
+   * rather than leaving the old one dangling as QUOTE_GENERATED/
+   * SENT_TO_WHATSAPP forever. The quote/order result is then cleared so a
+   * fresh confirmOrder() call is required for the edited values.
+   */
+  editOrder(): void {
+    const staleOrderId = this.orderResult()?.orderId;
+
+    this.goToStep(1);
+    this.quoteResult.set(null);
+    this.quoteError.set(null);
+    this.orderResult.set(null);
+    this.orderError.set(null);
+
+    if (staleOrderId) {
+      // Fire-and-forget: the customer shouldn't be blocked from editing if
+      // the cancel call fails — worst case, staff see an abandoned order
+      // and can cancel it manually.
+      this.pricingApi.cancelOrder(staleOrderId).subscribe({
+        error: (err) => console.error('Failed to cancel previous order', staleOrderId, err),
+      });
+    }
+  }
+
   reset(): void {
     this.currentStep.set(1);
     this.surfaceArea.set({ ...EMPTY_SURFACE });
