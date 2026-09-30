@@ -86,8 +86,8 @@ export class PricingApiService {
         desc: meta.desc,
         uses: meta.uses,
         pricePerM2: Number(row.price_per_m2),
-        bulkPricePerM2: meta.bulkPricePerM2,
-        bulkThresholdM2: meta.bulkThresholdM2,
+        bulkPricePerM2: Number(row.bulk_price_per_m2),
+        bulkThresholdM2: Number(row.bulk_threshold_m2),
       };
     });
 

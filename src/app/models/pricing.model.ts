@@ -1,11 +1,12 @@
 /**
  * Shapes for the `/get-details` Supabase edge function response and the
  * merged catalog used by the wizard. The backend (product_catalog,
- * roll_widths, delivery_zone_pricing tables) only stores the numbers
- * that actually drive pricing — it has no concept of icons, marketing
- * copy, bulk-rate tiers, or free-delivery thresholds. Those are kept as
- * static frontend-only config (see product-meta.config.ts) and merged
- * with the live price/rollWidths/zones fetched from the API.
+ * roll_widths, delivery_zone_pricing tables) stores the numbers that
+ * actually drive pricing, including bulk-rate price/threshold — it has
+ * no concept of icons, marketing copy, or free-delivery thresholds.
+ * Those are kept as static frontend-only config (see
+ * product-meta.config.ts) and merged with the live price/bulk-rate/
+ * rollWidths/zones fetched from the API.
  */
 
 /** Raw row shape returned by GET /get-details for one product_catalog entry. */
@@ -13,6 +14,8 @@ export interface ApiProductCatalogRow {
   product_type: string; // e.g. '150gsm' | '200gsm'
   label: string;
   price_per_m2: number;
+  bulk_price_per_m2: number;
+  bulk_threshold_m2: number;
 }
 
 /** Raw row shape returned by GET /get-details for one roll_widths entry. */
@@ -45,8 +48,8 @@ export interface ProductOption {
   desc: string;
   uses: string[];
   pricePerM2: number;     // live, from product_catalog.price_per_m2
-  bulkPricePerM2: number; // static frontend estimate only — NOT applied by the backend
-  bulkThresholdM2: number;
+  bulkPricePerM2: number; // live, from product_catalog.bulk_price_per_m2
+  bulkThresholdM2: number; // live, from product_catalog.bulk_threshold_m2
 }
 
 export interface DeliveryZone {

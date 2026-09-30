@@ -46,7 +46,10 @@ export class QuoteSummaryComponent {
           cut.extraM2 > 0 ? ` (+${cut.extraM2}m²)` : ' (exact fit)'
         }`,
       },
-      { label: 'Rate', value: `Rs ${quote.unitPrice}/m²` },
+      {
+        label: 'Rate',
+        value: `Rs ${this.state.currentPricePerM2()}/m²${this.state.isBulkRate() ? ' (bulk)' : ''}`,
+      },
       { label: 'Subtotal', value: `Rs ${quote.subtotal}` },
       delivery.mode === 'pickup'
         ? { label: 'Pickup', value: 'Tribeca — Free' }

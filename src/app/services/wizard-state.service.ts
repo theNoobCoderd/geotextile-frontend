@@ -113,17 +113,27 @@ export class WizardStateService {
     return this.rollCutOptions().find((r) => r.widthM === rollWidth) ?? null;
   });
 
+  /**
+   * Bulk status for any product is decided purely by the area entered on
+   * Step 1 (recommendedAreaM2) — it's settled the moment the customer
+   * clicks "Continue" there, so Step 2 can show the right rate on every
+   * product card immediately, before the customer has selected a product
+   * or roll width.
+   */
+  isBulkRateFor(opt: ProductOption): boolean {
+    return this.recommendedAreaM2() >= opt.bulkThresholdM2;
+  }
+
   readonly isBulkRate = computed(() => {
     const opt = this.selectedProductOption();
-    const cut = this.selectedRollCut();
-    if (!opt || !cut) return false;
-    return cut.billableAreaM2 >= opt.bulkThresholdM2;
+    if (!opt) return false;
+    return this.isBulkRateFor(opt);
   });
 
   readonly currentPricePerM2 = computed(() => {
     const opt = this.selectedProductOption();
     if (!opt) return 0;
-    return this.isBulkRate() ? opt.bulkPricePerM2 : opt.pricePerM2;
+    return this.isBulkRateFor(opt) ? opt.bulkPricePerM2 : opt.pricePerM2;
   });
 
   readonly productSubtotalRs = computed(() => {

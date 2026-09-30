@@ -24,12 +24,13 @@ export class StepProductRollComponent {
   }
 
   protected priceForProduct(product: ProductOption): number {
-    // Preview uses the *selected* product's live bulk state; for the
-    // not-yet-selected card we show its standard rate as the headline.
-    if (this.state.product().gsm === product.gsm) {
-      return this.state.currentPricePerM2();
-    }
-    return product.pricePerM2;
+    // Bulk status is fixed by the Step 1 area for every card, whether or
+    // not it's the selected one — no need to click into a product first.
+    return this.state.isBulkRateFor(product) ? product.bulkPricePerM2 : product.pricePerM2;
+  }
+
+  protected isBulkForProduct(product: ProductOption): boolean {
+    return this.state.isBulkRateFor(product);
   }
 
   protected selectProduct(gsm: 150 | 200 | null): void {

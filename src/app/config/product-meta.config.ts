@@ -1,21 +1,15 @@
 /**
- * Marketing copy and bulk-rate assumptions that don't exist in
+ * Marketing copy (name/icon/description/use-cases) that doesn't exist in
  * product_catalog. Keyed by the exact `product_type` string used in the
  * database (see supabase/functions/get-details). Merged onto the live
- * price_per_m2 fetched from the API in PricingApiService.
- *
- * IMPORTANT: bulkPricePerM2/bulkThresholdM2 are a frontend-only preview —
- * the quote/create-order edge functions always charge price_per_m2
- * regardless of area. If you need real bulk pricing, add it server-side
- * first, then wire the live number through here.
+ * price_per_m2/bulk_price_per_m2/bulk_threshold_m2 fetched from the API
+ * in PricingApiService.
  */
 export interface StaticProductMeta {
   name: string;
   icon: string;
   desc: string;
   uses: string[];
-  bulkPricePerM2: number;
-  bulkThresholdM2: number;
 }
 
 export const STATIC_PRODUCT_META: Record<string, StaticProductMeta> = {
@@ -24,16 +18,12 @@ export const STATIC_PRODUCT_META: Record<string, StaticProductMeta> = {
     icon: '🪴',
     desc: 'Lightweight woven fabric for garden paths and light foot traffic.',
     uses: ['Weed barrier', 'Garden paths', 'Light foot traffic'],
-    bulkPricePerM2: 75,
-    bulkThresholdM2: 100,
   },
   '200gsm': {
     name: 'Heavy-duty applications',
     icon: '🏗️',
     desc: 'Reinforced fabric for driveways, drainage, and erosion control.',
     uses: ['Driveways', 'Drainage', 'Erosion control'],
-    bulkPricePerM2: 95,
-    bulkThresholdM2: 100,
   },
 };
 
@@ -42,8 +32,6 @@ const FALLBACK_META: StaticProductMeta = {
   icon: '📦',
   desc: '',
   uses: [],
-  bulkPricePerM2: 0,
-  bulkThresholdM2: Number.POSITIVE_INFINITY,
 };
 
 export function metaForProductType(productType: string): StaticProductMeta {
