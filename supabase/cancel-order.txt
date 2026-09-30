@@ -1,0 +1,73 @@
+// supabase/functions/cancel-order/index.ts
+//
+// Customer-facing: cancels an order the customer is abandoning, most
+// commonly because they went back to "Edit my order" in the wizard after
+// already confirming once (see WizardStateService.editOrder() /
+// PricingApiService.cancelOrder() in the Angular app). Talks to Postgres
+// directly (plain SQL), same as quote/create-order, so no RLS/auth
+// dependency — anyone holding the order's UUID can cancel it, same trust
+// level as the other public endpoints (the UUID is only ever known to the
+// customer who created it and to staff).
+//
+// Only cancels orders that aren't already FULFILLED or CANCELLED — we never
+// want to "un-fulfill" or re-cancel an order that's already done.
+//
+// Env vars required: DATABASE_URL (Transaction pooler connection string).
+
+import postgres from "npm:postgres";
+
+const sql = postgres(Deno.env.get("DATABASE_URL")!, { max: 1 });
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+interface CancelOrderRequest {
+  orderId: string;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const body = (await req.json()) as CancelOrderRequest;
+
+    if (!body.orderId) {
+      return new Response(
+        JSON.stringify({ error: "orderId is required" }),
+        { status: 400, headers: { ...corsHeaders, "content-type": "application/json" } },
+      );
+    }
+
+    const updated = await sql`
+      update orders
+      set status = 'CANCELLED'
+      where id = ${body.orderId}
+        and status not in ('FULFILLED', 'CANCELLED')
+      returning id, status
+    `;
+
+    if (updated.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Order not found, or already fulfilled/cancelled" }),
+        { status: 404, headers: { ...corsHeaders, "content-type": "application/json" } },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ orderId: updated[0].id, status: updated[0].status }),
+      { status: 200, headers: { ...corsHeaders, "content-type": "application/json" } },
+    );
+  } catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: "Internal error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "content-type": "application/json" },
+    });
+  }
+});

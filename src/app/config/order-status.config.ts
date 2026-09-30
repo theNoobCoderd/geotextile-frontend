@@ -37,3 +37,17 @@ export const NEXT_STATUS_OPTIONS: Record<OrderStatus, OrderStatus[]> = {
   FULFILLED: [],
   CANCELLED: [],
 };
+
+/**
+ * Plain-language status copy shown to customers on the "Track my order"
+ * section — friendlier than the admin dashboard's internal labels above.
+ */
+export const CUSTOMER_ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  QUOTE_GENERATED: 'Quote received',
+  SENT_TO_WHATSAPP: 'Order sent — awaiting confirmation',
+  DEPOSIT_PENDING: 'Awaiting your deposit',
+  DEPOSIT_PAID: 'Deposit received — thank you!',
+  ORDERED_FROM_SUPPLIER: 'Preparing your order',
+  FULFILLED: 'Delivered / picked up',
+  CANCELLED: 'Cancelled',
+};

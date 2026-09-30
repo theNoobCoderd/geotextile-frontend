@@ -1,0 +1,81 @@
+// supabase/functions/track-order/index.ts
+//
+// Customer-facing: looks up orders by the WhatsApp/phone number the
+// customer entered when placing them, so they can check status without an
+// account. Talks to Postgres directly (plain SQL), same as
+// quote/create-order/cancel-order — no auth required, matching the trust
+// level of those endpoints (a phone number only surfaces that phone's own
+// orders, nothing else).
+//
+// Phone matching is digit-only (strips spaces, dashes, "+", parentheses) on
+// both sides so "5833 5318", "+230 5833-5318" and "58335318" all match the
+// same stored number.
+//
+// Env vars required: DATABASE_URL (Transaction pooler connection string).
+
+import postgres from "npm:postgres";
+
+const sql = postgres(Deno.env.get("DATABASE_URL")!, { max: 1 });
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+interface TrackOrderRequest {
+  phone: string;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const body = (await req.json()) as TrackOrderRequest;
+    const digitsOnly = (body.phone ?? "").replace(/\D/g, "");
+
+    if (!digitsOnly || digitsOnly.length < 7) {
+      return new Response(
+        JSON.stringify({ error: "Enter a valid phone number" }),
+        { status: 400, headers: { ...corsHeaders, "content-type": "application/json" } },
+      );
+    }
+
+    const rows = await sql`
+      select id, created_at, status, product_type, roll_width_m, material_area_m2,
+             fulfillment_mode, zone, grand_total, deposit_percentage, deposit_amount
+      from orders
+      where regexp_replace(customer_whatsapp, '\\D', '', 'g') = ${digitsOnly}
+      order by created_at desc
+      limit 20
+    `;
+
+    const orders = rows.map((r) => ({
+      orderId: r.id,
+      createdAt: r.created_at,
+      status: r.status,
+      productType: r.product_type,
+      rollWidthM: Number(r.roll_width_m),
+      materialAreaM2: Number(r.material_area_m2),
+      fulfillmentMode: r.fulfillment_mode,
+      zone: r.zone,
+      grandTotal: Number(r.grand_total),
+      depositPercent: Number(r.deposit_percentage),
+      depositAmount: Number(r.deposit_amount),
+    }));
+
+    return new Response(JSON.stringify({ orders }), {
+      status: 200,
+      headers: { ...corsHeaders, "content-type": "application/json" },
+    });
+  } catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: "Internal error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "content-type": "application/json" },
+    });
+  }
+});

@@ -1,0 +1,50 @@
+<section id="track-order" class="track">
+  <div class="track__inner">
+    <h2 class="track__title">Track my order</h2>
+    <p class="track__subtitle">Enter the WhatsApp/phone number you used to place your order.</p>
+
+    <form class="track__form" (ngSubmit)="search()">
+      <input
+        type="tel"
+        name="phone"
+        placeholder="e.g. 5833 5318"
+        [(ngModel)]="phone"
+        [disabled]="loading()"
+      />
+      <button type="submit" class="track__submit" [disabled]="loading()">
+        {{ loading() ? 'Searching…' : 'Check status' }}
+      </button>
+    </form>
+
+    @if (error()) {
+      <p class="track__error">{{ error() }}</p>
+    }
+
+    @if (orders(); as results) {
+      @if (results.length === 0) {
+        <p class="track__empty">No orders found for that number.</p>
+      } @else {
+        <div class="track__list">
+          @for (order of results; track order.orderId) {
+            <div class="track-card">
+              <div class="track-card__row">
+                <span class="track-card__id">Order #{{ order.orderId.slice(0, 8) }}</span>
+                <span class="track-card__date">{{ order.createdAt | date: 'dd MMM yyyy' }}</span>
+              </div>
+              <div class="track-card__row">
+                <span class="track-card__product">{{ order.productType }} — {{ order.materialAreaM2 }}m²</span>
+                <span class="track-card__status track-card__status--{{ order.status.toLowerCase() }}">
+                  {{ statusLabels[order.status] }}
+                </span>
+              </div>
+              <div class="track-card__row track-card__row--muted">
+                <span>{{ order.fulfillmentMode === 'delivery' ? 'Delivery — ' + order.zone : 'Pickup' }}</span>
+                <span>Rs {{ order.grandTotal }} total · Rs {{ order.depositAmount }} deposit</span>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+</section>

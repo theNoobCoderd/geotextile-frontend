@@ -4,6 +4,7 @@ import { Observable, map } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { ApiGetDetailsResponse, DeliveryZone, PricingCatalog, ProductOption } from '../models/pricing.model';
 import { CreateOrderResult, QuoteResult } from '../models/wizard-state.model';
+import { TrackOrderResponse, TrackedOrder } from '../models/track-order.model';
 import {
   STATIC_DEFAULT_DEPOSIT_PERCENT,
   STATIC_FREE_DELIVERY_THRESHOLD_M2,
@@ -84,6 +85,18 @@ export class PricingApiService {
     return this.http
       .post(`${this.functionsUrl}/cancel-order`, { orderId }, { headers: this.headers })
       .pipe(map(() => undefined));
+  }
+
+  /**
+   * Looks up every order placed with the given phone number, most recent
+   * first — powers the public "Track my order" section. No account/login
+   * needed; the phone number is the lookup key (see track-order edge
+   * function for the digit-only normalization).
+   */
+  trackOrders(phone: string): Observable<TrackedOrder[]> {
+    return this.http
+      .post<TrackOrderResponse>(`${this.functionsUrl}/track-order`, { phone }, { headers: this.headers })
+      .pipe(map((res) => res.orders ?? []));
   }
 
   private toPricingCatalog(raw: ApiGetDetailsResponse): PricingCatalog {
